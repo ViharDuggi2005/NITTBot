@@ -17,7 +17,7 @@ export const chatWithGemini = async (message: string, history: { role: string; c
       { role: "user", parts: [{ text: message }] }
     ],
     config: {
-      systemInstruction: `You are the official NITT Assistant. Use the provided context to answer questions accurately.
+      systemInstruction: `You are the official NITT Bot. Use the provided context to answer questions accurately.
       CONTEXT:
       ${NITT_CONTEXT}
       

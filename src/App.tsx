@@ -24,9 +24,26 @@ const SUGGESTED_QUESTIONS = [
 ];
 
 export default function App() {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'bot', content: "Hi! I'm your **NITT Assistant**. How can I help you today? You can ask about admissions, placements, campus life, or any specific department." }
-  ]);
+  const [activeChatId, setActiveChatId] = useState<string>('main');
+  const [chats, setChats] = useState<Record<string, Message[]>>({
+    main: [
+      { role: 'bot', content: "Hi! I'm your **NITT Bot**. How can I help you today? You can ask about admissions, placements, campus life, or any specific department." }
+    ],
+    admissions: [
+      { role: 'bot', content: "Welcome to the **Admissions Desk**. I can help with JoSAA, B.Tech eligibility, PG gate scores, or NRI admissions." }
+    ],
+    placements: [
+      { role: 'bot', content: "This is the **Placement Portal Analyst**. Ask me about salary packages, top recruiters, or training for specific branches." }
+    ],
+    campus: [
+      { role: 'bot', content: "Explore **NITT Campus Life**. Ask about fests like Festember, hostel facilities, or student clubs!" }
+    ],
+    contact: [
+      { role: 'bot', content: "How can I help you reach us? I can provide **Contact Numbers**, Location details, or transport info." }
+    ]
+  });
+
+  const messages = chats[activeChatId] || [];
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -35,28 +52,45 @@ export default function App() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, activeChatId]);
 
-  const handleSend = async (text: string = input) => {
+  const handleSend = async (text: string = input, chatId: string = activeChatId) => {
     if (!text.trim() || isLoading) return;
 
     const userMessage = text.trim();
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    if (chatId === activeChatId) setInput('');
+    
+    // Update the specific chat's history
+    setChats(prev => ({
+      ...prev,
+      [chatId]: [...(prev[chatId] || []), { role: 'user', content: userMessage }]
+    }));
+    
     setIsLoading(true);
 
     try {
-      const response = await chatWithGemini(userMessage, messages.map(m => ({
+      const response = await chatWithGemini(userMessage, chats[chatId].map(m => ({
         role: m.role,
         content: m.content
       })));
-      setMessages(prev => [...prev, { role: 'bot', content: response }]);
+      
+      setChats(prev => ({
+        ...prev,
+        [chatId]: [...(prev[chatId] || []), { role: 'bot', content: response }]
+      }));
     } catch (error) {
       console.error(error);
-      setMessages(prev => [...prev, { role: 'bot', content: "Sorry, I encountered an error. Please try again later." }]);
+      setChats(prev => ({
+        ...prev,
+        [chatId]: [...(prev[chatId] || []), { role: 'bot', content: "Sorry, I encountered an error. Please try again later." }]
+      }));
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const switchChat = (newId: string) => {
+    setActiveChatId(newId);
   };
 
   return (
@@ -64,69 +98,65 @@ export default function App() {
       {/* Sidebar - Visible on md and up */}
       <aside className="hidden md:flex w-72 bg-white border-r border-slate-200 flex-col p-6 shadow-sm z-20 shrink-0">
         <div className="flex items-center gap-3 mb-10">
-          <div className="w-10 h-10 bg-[#003366] rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-900/10">
-            N
+          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm overflow-hidden border border-slate-100 transition-transform hover:scale-110 cursor-pointer" onClick={() => switchChat('main')}>
+            <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/NITT_logo.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original" alt="NITT Logo" className="w-8 h-8 object-contain" />
           </div>
           <div>
-            <h1 className="font-bold text-slate-900 leading-tight">NITT AI</h1>
-            <p className="text-xs text-slate-400 font-medium">Institute Assistant</p>
+            <h1 className="font-bold text-slate-900 leading-tight">NITT Bot</h1>
+            <p className="text-xs text-slate-400 font-medium">Institute Bot</p>
           </div>
         </div>
 
         <div className="flex-1 space-y-8 overflow-y-auto pr-2 custom-scrollbar">
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-4 flex items-center gap-2">
-              <Database size={10} /> Dataset Info
-            </p>
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 shadow-sm transition-all hover:shadow-md">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[11px] font-semibold text-slate-600">Assistant Status</span>
-                <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold uppercase">Online</span>
-              </div>
-              <p className="text-2xl font-bold text-slate-900 leading-none mt-2">200+</p>
-              <p className="text-[11px] text-slate-500 mt-1 uppercase tracking-tighter font-medium">Questions Indexed</p>
-            </div>
-          </div>
-
           <nav className="space-y-1">
             <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-4 flex items-center gap-2">
-              <MessageSquare size={10} /> Experience
+              <MessageSquare size={10} /> Chat History
             </p>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 bg-slate-100 text-slate-900 rounded-lg font-bold text-left transition-all">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-600"></div>
+            <button 
+              onClick={() => switchChat('main')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-bold text-left transition-all ${
+                activeChatId === 'main' ? 'bg-[#003366] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <div className={`w-1.5 h-1.5 rounded-full ${activeChatId === 'main' ? 'bg-blue-400 animate-pulse' : 'bg-slate-300'}`}></div>
               Main Console
             </button>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-all text-left font-medium">
+            <button 
+              onClick={() => switchChat('admissions')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left font-bold ${
+                activeChatId === 'admissions' ? 'bg-[#003366] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
               <Building2 size={16} /> Admissions
             </button>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-all text-left font-medium">
+            <button 
+              onClick={() => switchChat('placements')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left font-bold ${
+                activeChatId === 'placements' ? 'bg-[#003366] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
               <Trophy size={16} /> Placements
             </button>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-all text-left font-medium">
+            <button 
+              onClick={() => switchChat('campus')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left font-bold ${
+                activeChatId === 'campus' ? 'bg-[#003366] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
               <Coffee size={16} /> Campus Life
             </button>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 text-slate-500 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-all text-left font-medium">
+            <button 
+              onClick={() => switchChat('contact')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left font-bold ${
+                activeChatId === 'contact' ? 'bg-[#003366] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
               <MapPin size={16} /> Contact Us
             </button>
           </nav>
         </div>
 
-        <div className="pt-6 border-t border-slate-100 mt-auto">
-          <div className="bg-slate-50 p-4 rounded-xl space-y-3">
-             <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#003366] flex items-center justify-center text-white text-[10px] font-bold">
-                    UA
-                </div>
-                <div className="flex-1 text-[11px]">
-                  <p className="font-bold text-slate-700 leading-none">NITT Student</p>
-                  <p className="text-slate-400 mt-0.5">Joined via Portal</p>
-                </div>
-             </div>
-             <p className="text-[10px] text-blue-600 font-bold bg-blue-50 p-2 rounded-lg text-center uppercase tracking-tighter">
-                Accredited Knowledge Base
-             </p>
-          </div>
-        </div>
+
       </aside>
 
       {/* Main Content Area */}
@@ -134,21 +164,19 @@ export default function App() {
         {/* Header */}
         <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md flex items-center justify-between px-6 md:px-10 z-10 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="md:hidden w-8 h-8 bg-[#003366] rounded-md flex items-center justify-center text-white font-bold text-sm">N</div>
+            <div className="md:hidden w-8 h-8 bg-white border border-slate-100 rounded-md flex items-center justify-center p-1 shadow-sm">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/NITT_logo.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original" alt="NITT Logo" className="w-full h-full object-contain" />
+            </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm animate-pulse"></span>
-                <span className="font-bold text-slate-800 text-sm tracking-tight">NITT Assistant Console</span>
+                <span className="font-bold text-slate-800 text-sm tracking-tight capitalize">{activeChatId} Bot</span>
               </div>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest hidden sm:block">AI-Powered University Guide</span>
             </div>
           </div>
           <div className="flex gap-3">
-            <button className="hidden sm:inline-flex items-center gap-2 px-4 py-2 text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-600">
-               <Database size={14} /> Training Data
-            </button>
-            <button className="px-5 py-2 text-xs font-bold bg-[#003366] text-white rounded-xl shadow-lg shadow-blue-900/20 hover:scale-105 transition-all active:scale-95">
-                New Session
+            <button className="hidden lg:inline-flex items-center gap-2 px-4 py-2 text-xs font-bold border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-slate-600">
+               <Database size={14} /> Knowledge Graph
             </button>
           </div>
         </header>
@@ -156,13 +184,13 @@ export default function App() {
         {/* Chat Area */}
         <div 
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-4 md:px-10 py-8 md:py-12 scroll-smooth"
+          className="flex-1 overflow-y-auto px-4 md:px-10 py-8 md:py-12 scroll-smooth bg-white/40"
         >
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-4xl mx-auto space-y-6 pb-24">
             <AnimatePresence mode="popLayout" initial={false}>
               {messages.map((message, index) => (
                 <motion.div
-                  key={index}
+                  key={`${activeChatId}-${index}`}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
@@ -179,10 +207,10 @@ export default function App() {
                       ? 'bg-white px-5 py-3.5 rounded-2xl rounded-tr-none shadow-sm border border-slate-100 text-slate-700' 
                       : 'bg-[#003366] text-white px-5 py-3.5 rounded-2xl rounded-tl-none shadow-xl border border-blue-900/10'
                   }`}>
-                    <div className={`prose prose-sm max-w-none ${message.role === 'bot' ? 'prose-invert' : 'prose-slate'}`}>
+                    <div className={`prose prose-sm max-w-none ${message.role === 'bot' ? 'prose-invert font-light' : 'prose-slate font-medium'}`}>
                       <ReactMarkdown 
                         components={{
-                          p: ({ children }) => <p className="mb-0 leading-relaxed text-[13.5px] font-medium">{children}</p>,
+                          p: ({ children }) => <p className="mb-0 leading-relaxed text-[13.5px]">{children}</p>,
                           ul: ({ children }) => <ul className="mt-2 space-y-1 mb-0 border-t border-white/10 pt-2">{children}</ul>,
                           li: ({ children }) => <li className="text-[12px] opacity-90"><span className="mr-2 opacity-50">•</span>{children}</li>,
                           strong: ({ children }) => <strong className="font-bold text-white border-b border-white/20">{children}</strong>
@@ -212,8 +240,12 @@ export default function App() {
                   AI
                 </div>
                 <div className="bg-[#003366]/5 px-4 py-3 rounded-2xl rounded-tl-none border border-slate-100 flex items-center gap-3">
-                  <Loader2 className="animate-spin w-4 h-4 text-blue-600" />
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Analyzing Dataset...</span>
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                    <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                    <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                  </div>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Generating Analyst Insights...</span>
                 </div>
               </motion.div>
             )}
@@ -221,11 +253,11 @@ export default function App() {
         </div>
 
         {/* Input Footer */}
-        <div className="p-8 pt-0 shrink-0 bg-gradient-to-t from-[#F4F7F6] via-[#F4F7F6]/80 to-transparent">
+        <div className="p-8 pt-0 shrink-0 bg-gradient-to-t from-[#F4F7F6] via-[#F4F7F6] to-transparent sticky bottom-0">
           <div className="max-w-4xl mx-auto space-y-4">
             {/* Quick Suggestions */}
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar mask-fade-right">
-              {SUGGESTED_QUESTIONS.map((q, i) => (
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar sm:flex-wrap sm:overflow-visible">
+              {(activeChatId === 'main' ? SUGGESTED_QUESTIONS : []).map((q, i) => (
                 <button
                   key={i}
                   onClick={() => handleSend(q)}
@@ -243,8 +275,8 @@ export default function App() {
                 value={input}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Query the NITT Knowledge Base (200 questions indexed)..." 
-                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4.5 pr-32 shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 text-slate-600 transition-all font-medium placeholder:font-normal"
+                placeholder={`Ask the ${activeChatId} desk...`}
+                className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4.5 pr-32 shadow-2xl shadow-blue-900/5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 text-slate-700 transition-all font-medium placeholder:font-normal"
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-3">
                 <span className="hidden sm:block text-[10px] text-slate-400 font-bold bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200">ENTER</span>
@@ -258,7 +290,7 @@ export default function App() {
               </div>
             </div>
             <p className="text-center text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-              Developed for National Institute of Technology, Tiruchirappalli
+              Engineering Excellence • NIT Trichy
             </p>
           </div>
         </div>
@@ -266,4 +298,5 @@ export default function App() {
     </div>
   );
 }
+
 
